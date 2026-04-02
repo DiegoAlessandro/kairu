@@ -69,8 +69,8 @@ final class KairuConfig: ObservableObject {
     private init() {
         let modeRaw = defaults.string(forKey: "connectionMode") ?? "docker"
         self.connectionMode = ConnectionMode(rawValue: modeRaw) ?? .docker
-        self.containerName = defaults.string(forKey: "containerName") ?? "openclaw-parenting-ai"
-        self.sshHost = defaults.string(forKey: "sshHost") ?? "pi@openclaw-pi"
+        self.containerName = defaults.string(forKey: "containerName") ?? "openclaw"
+        self.sshHost = defaults.string(forKey: "sshHost") ?? "user@localhost"
         self.agentName = defaults.string(forKey: "agentName") ?? "main"
         self.timeoutSeconds = defaults.integer(forKey: "timeoutSeconds").nonZero ?? 120
         self.dolphinX = defaults.double(forKey: "dolphinX")

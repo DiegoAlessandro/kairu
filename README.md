@@ -71,15 +71,15 @@ npm i -g openclaw
 openclaw gateway &
 
 # Tell Kairu to use native mode:
-defaults write com.iiba.kairu connectionMode "native"
+defaults write com.kairu.app connectionMode "native"
 ```
 
 ### SSH (remote — Raspberry Pi, server, etc.)
 
 ```bash
 # OpenClaw running on a Raspberry Pi or remote server:
-defaults write com.iiba.kairu connectionMode "ssh"
-defaults write com.iiba.kairu sshHost "pi@openclaw-pi"
+defaults write com.kairu.app connectionMode "ssh"
+defaults write com.kairu.app sshHost "user@your-server"
 ```
 
 ### Configuration
@@ -87,8 +87,8 @@ defaults write com.iiba.kairu sshHost "pi@openclaw-pi"
 | Setting | Default | `defaults write` key | Description |
 |---------|---------|---------------------|-------------|
 | Mode | `docker` | `connectionMode` | `docker` / `native` / `ssh` |
-| Container | `openclaw-parenting-ai` | `containerName` | Docker container name |
-| SSH Host | `pi@openclaw-pi` | `sshHost` | SSH target for remote mode |
+| Container | `openclaw` | `containerName` | Docker container name |
+| SSH Host | `user@your-server` | `sshHost` | SSH target for remote mode |
 | Agent | `main` | `agentName` | OpenClaw agent to talk to |
 | Timeout | `120s` | `timeoutSeconds` | Max wait for AI response |
 

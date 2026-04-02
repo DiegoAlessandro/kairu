@@ -33,5 +33,5 @@ User Input → Kairu App → docker exec (stdin) → OpenClaw Container → AI M
 
 ## Reporting Vulnerabilities
 
-If you find a security issue, please email diegobacigalupo8@gmail.com
+If you find a security issue, please open a private security advisory on GitHub
 instead of opening a public issue. We aim to respond within 48 hours.

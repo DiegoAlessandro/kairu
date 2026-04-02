@@ -33,7 +33,7 @@ cat > "$CONTENTS/Info.plist" << 'PLIST'
     <key>CFBundleDisplayName</key>
     <string>Kairu - Dolphin Assistant</string>
     <key>CFBundleIdentifier</key>
-    <string>com.iiba.kairu</string>
+    <string>com.kairu.app</string>
     <key>CFBundleVersion</key>
     <string>1.0.0</string>
     <key>CFBundleShortVersionString</key>
