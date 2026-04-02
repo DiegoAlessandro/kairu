@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published var isChatVisible = false
     @Published var dolphinState: DolphinAnimationState = .idle
 
+    private var hotkeyRecorder: HotkeyRecorderPanel?
     private var cancellables = Set<AnyCancellable>()
     private var globalMonitor: Any?
 
@@ -120,6 +121,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 }
             }
         }
+    }
+
+    // MARK: - Hotkey recorder
+
+    func showHotkeyRecorder() {
+        let recorder = HotkeyRecorderPanel()
+        recorder.showAndRecord { [weak self] mods, keyCode in
+            let config = KairuConfig.shared
+            config.hotkeyModifiers = mods
+            config.hotkeyKeyCode = keyCode
+            self?.registerGlobalHotkey()
+        }
+        hotkeyRecorder = recorder
     }
 
     // MARK: - Dolphin movement tracking
