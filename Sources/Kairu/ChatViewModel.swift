@@ -23,8 +23,8 @@ final class ChatViewModel: ObservableObject {
     @Published var isThinking = false
     @Published var isConnected = false
     @Published private(set) var isSending = false
+    @Published private(set) var lastUserMessage: String?
 
-    // Create new service (with new session ID) on clear
     private var openClawService = OpenClawService()
 
     func checkConnection() {
@@ -39,6 +39,7 @@ final class ChatViewModel: ObservableObject {
         guard !isSending else { return }
         isSending = true
 
+        lastUserMessage = text
         messages.append(ChatMessage(text: text, isUser: true))
         isThinking = true
 

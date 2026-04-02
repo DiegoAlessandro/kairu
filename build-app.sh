@@ -40,6 +40,8 @@ cat > "$CONTENTS/Info.plist" << 'PLIST'
     <string>1.0.0</string>
     <key>CFBundleExecutable</key>
     <string>Kairu</string>
+    <key>CFBundleIconFile</key>
+    <string>Kairu</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSUIElement</key>
@@ -51,6 +53,14 @@ cat > "$CONTENTS/Info.plist" << 'PLIST'
 </dict>
 </plist>
 PLIST
+
+# Copy icon if available
+ICNS_SRC="$BUILD_DIR/Kairu_Kairu.bundle/Kairu.icns"
+if [ -f "$ICNS_SRC" ]; then
+  cp "$ICNS_SRC" "$RESOURCES/Kairu.icns"
+elif [ -f "Sources/Kairu/Resources/Kairu.icns" ]; then
+  cp "Sources/Kairu/Resources/Kairu.icns" "$RESOURCES/Kairu.icns"
+fi
 
 echo "✅ Built: $APP_BUNDLE"
 echo ""

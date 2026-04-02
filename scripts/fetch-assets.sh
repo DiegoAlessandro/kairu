@@ -32,6 +32,31 @@ curl -sL -o "$RESOURCES/kairu_talking.gif" \
 
 echo ""
 
+# Generate app icon from kairu.png
+echo "  [5/5] Kairu.icns (app icon)"
+ICONSET="/tmp/Kairu.iconset"
+rm -rf "$ICONSET" && mkdir -p "$ICONSET"
+if [ -f "$RESOURCES/kairu.png" ]; then
+  for size in 16 32 64 128 256 512 1024; do
+    sips -z $size $size "$RESOURCES/kairu.png" --out "$ICONSET/tmp_${size}.png" >/dev/null 2>&1
+  done
+  cp "$ICONSET/tmp_16.png"   "$ICONSET/icon_16x16.png"
+  cp "$ICONSET/tmp_32.png"   "$ICONSET/icon_16x16@2x.png"
+  cp "$ICONSET/tmp_32.png"   "$ICONSET/icon_32x32.png"
+  cp "$ICONSET/tmp_64.png"   "$ICONSET/icon_32x32@2x.png"
+  cp "$ICONSET/tmp_128.png"  "$ICONSET/icon_128x128.png"
+  cp "$ICONSET/tmp_256.png"  "$ICONSET/icon_128x128@2x.png"
+  cp "$ICONSET/tmp_256.png"  "$ICONSET/icon_256x256.png"
+  cp "$ICONSET/tmp_512.png"  "$ICONSET/icon_256x256@2x.png"
+  cp "$ICONSET/tmp_512.png"  "$ICONSET/icon_512x512.png"
+  cp "$ICONSET/tmp_1024.png" "$ICONSET/icon_512x512@2x.png"
+  rm -f "$ICONSET"/tmp_*.png
+  iconutil -c icns "$ICONSET" -o "$RESOURCES/Kairu.icns" 2>/dev/null && echo "    → Kairu.icns 生成完了"
+  rm -rf "$ICONSET"
+fi
+
+echo ""
+
 # Verify downloads
 OK=0
 FAIL=0

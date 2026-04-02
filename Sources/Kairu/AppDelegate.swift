@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Combine
 import SwiftUI
 
@@ -12,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published var dolphinState: DolphinAnimationState = .idle
 
     private var cancellables = Set<AnyCancellable>()
+    private var globalMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -26,7 +28,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         setupDolphinPanel()
         setupChatBubblePanel()
         observeDolphinMovement()
+        registerGlobalHotkey()
     }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let monitor = globalMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+    }
+
+    // MARK: - Panel setup
 
     private func setupDolphinPanel() {
         let dolphinView = DolphinSyncView(appDelegate: self)
@@ -41,6 +52,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         chatBubblePanel = ChatBubblePanel(contentView: chatView)
     }
 
+    // MARK: - Toggle actions
+
     func toggleChat() {
         isChatVisible.toggle()
         if isChatVisible {
@@ -52,9 +65,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             }
             positionChatBubble()
             chatBubblePanel?.show()
+            // Focus the input field
+            chatBubblePanel?.makeKey()
         } else {
             chatBubblePanel?.orderOut(nil)
             dolphinState = .idle
+        }
+    }
+
+    /// Open chat and immediately focus the input (for hotkey)
+    func activateChat() {
+        if !isDolphinVisible {
+            isDolphinVisible = true
+            dolphinPanel?.show()
+        }
+        if !isChatVisible {
+            toggleChat()
+        } else {
+            // Already open — just bring to front and focus
+            chatBubblePanel?.makeKey()
         }
     }
 
@@ -69,13 +98,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 
+    // MARK: - Global hotkey
+
+    func registerGlobalHotkey() {
+        // Remove existing monitor
+        if let monitor = globalMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalMonitor = nil
+        }
+
+        let config = KairuConfig.shared
+        let targetMods = NSEvent.ModifierFlags(rawValue: UInt(config.hotkeyModifiers))
+            .intersection([.command, .shift, .option, .control])
+        let targetKey = UInt16(config.hotkeyKeyCode)
+
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let eventMods = event.modifierFlags.intersection([.command, .shift, .option, .control])
+            if event.keyCode == targetKey && eventMods == targetMods {
+                Task { @MainActor in
+                    self?.activateChat()
+                }
+            }
+        }
+    }
+
+    // MARK: - Dolphin movement tracking
+
     private func observeDolphinMovement() {
-        // Follow dolphin with chat bubble
         NotificationCenter.default.publisher(for: NSWindow.didMoveNotification, object: dolphinPanel)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                // Save position on every move
                 self.dolphinPanel?.savePosition()
                 if self.isChatVisible {
                     self.positionChatBubble()
@@ -85,15 +138,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     private func positionChatBubble() {
-        guard let dolphinFrame = dolphinPanel?.frame else { return }
-        let chatWidth: CGFloat = 260
-        let chatHeight: CGFloat = 340
+        guard let dolphinFrame = dolphinPanel?.frame,
+              let bubbleFrame = chatBubblePanel?.frame else { return }
+        let chatWidth = bubbleFrame.width
+        let chatHeight = bubbleFrame.height
 
-        // Position above the dolphin
         var x = dolphinFrame.origin.x + (dolphinFrame.width - chatWidth) / 2
         var y = dolphinFrame.origin.y + dolphinFrame.height + 4
 
-        // Clamp to screen bounds
         if let screen = NSScreen.screens.first(where: { $0.visibleFrame.intersects(dolphinFrame) })
             ?? NSScreen.main
         {
@@ -101,7 +153,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             x = min(max(x, sf.minX), sf.maxX - chatWidth)
             y = min(max(y, sf.minY), sf.maxY - chatHeight)
 
-            // If not enough room above, put below
             if y + chatHeight > sf.maxY {
                 y = dolphinFrame.origin.y - chatHeight - 4
             }
