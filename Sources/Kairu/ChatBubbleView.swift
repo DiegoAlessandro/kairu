@@ -104,9 +104,9 @@ struct ChatBubbleView: View {
 
                 Spacer()
 
-                // Options button
-                Button(action: {}) {
-                    Text("オプション(O)")
+                // Clear button
+                Button(action: { viewModel.clearHistory() }) {
+                    Text("クリア(C)")
                         .font(.system(size: 11))
                         .foregroundStyle(.black)
                         .padding(.horizontal, 12)

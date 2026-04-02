@@ -22,6 +22,9 @@ struct OpenClawConnectionConfig: Sendable {
 }
 
 actor OpenClawService {
+    /// Persistent session ID so OpenClaw remembers conversation context
+    private let sessionId = "kairu-\(UUID().uuidString.prefix(8))"
+
     enum ConnectionStatus: Sendable, Equatable {
         case connected
         case disconnected
@@ -35,6 +38,7 @@ actor OpenClawService {
             let output = try await runProcess(arguments: args, timeoutSeconds: 5)
             let clean = output.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             return clean.contains("ok") || clean.contains("healthy") || clean.contains("live")
+                || clean.contains("agents:")
                 ? .connected : .disconnected
         } catch {
             return .error(error.localizedDescription)
@@ -44,7 +48,8 @@ actor OpenClawService {
     /// Send a message to OpenClaw via stdin pipe
     func sendMessage(_ text: String, config: OpenClawConnectionConfig) async -> String {
         // Build the openclaw agent command
-        let ocArgs = ["openclaw", "agent", "--agent", config.agentName, "--local", "-m", text]
+        let ocArgs = ["openclaw", "agent", "--agent", config.agentName, "--local",
+                      "--session-id", sessionId, "-m", text]
         let args = buildCommand(config: config, subcommand: ocArgs)
 
         do {

@@ -18,13 +18,14 @@ struct ChatMessage: Identifiable, Sendable {
 @MainActor
 final class ChatViewModel: ObservableObject {
     @Published var messages: [ChatMessage] = [
-        ChatMessage(text: "こんにちは！何かお手伝いしますか？ 🐬", isUser: false)
+        ChatMessage(text: "こんにちは！何について調べますか？ 🐬", isUser: false)
     ]
     @Published var isThinking = false
     @Published var isConnected = false
     @Published private(set) var isSending = false
 
-    private let openClawService = OpenClawService()
+    // Create new service (with new session ID) on clear
+    private var openClawService = OpenClawService()
 
     func checkConnection() {
         Task {
@@ -35,7 +36,6 @@ final class ChatViewModel: ObservableObject {
     }
 
     func send(_ text: String) {
-        // Prevent multiple concurrent sends
         guard !isSending else { return }
         isSending = true
 
@@ -53,7 +53,9 @@ final class ChatViewModel: ObservableObject {
 
     func clearHistory() {
         messages = [
-            ChatMessage(text: "こんにちは！何かお手伝いしますか？ 🐬", isUser: false)
+            ChatMessage(text: "こんにちは！何について調べますか？ 🐬", isUser: false)
         ]
+        // New service = new session ID = fresh OpenClaw context
+        openClawService = OpenClawService()
     }
 }
