@@ -52,42 +52,54 @@ open .build/debug/Kairu.app
 cp -r .build/debug/Kairu.app /Applications/
 ```
 
-## OpenClaw Setup
+## Connection Modes
 
-Kairu connects to a local OpenClaw gateway running in Docker.
+Kairu works with **any** OpenClaw installation — Docker, native, or remote.
+
+### Docker (default)
 
 ```bash
-# Example: start OpenClaw (adjust to your setup)
-cd your-openclaw-dir/docker
-docker compose up -d
+cd your-openclaw-dir/docker && docker compose up -d
+# Kairu auto-connects via: docker exec <container> openclaw agent ...
+```
 
-# Verify it's healthy
-docker inspect --format '{{.State.Health.Status}}' openclaw-parenting-ai
+### Native (openclaw installed locally)
+
+```bash
+# If you installed openclaw via npm:
+npm i -g openclaw
+openclaw gateway &
+
+# Tell Kairu to use native mode:
+defaults write com.iiba.kairu connectionMode "native"
+```
+
+### SSH (remote — Raspberry Pi, server, etc.)
+
+```bash
+# OpenClaw running on a Raspberry Pi or remote server:
+defaults write com.iiba.kairu connectionMode "ssh"
+defaults write com.iiba.kairu sshHost "pi@openclaw-pi"
 ```
 
 ### Configuration
 
-On first launch, Kairu uses these defaults (changeable in-app or via `defaults` command):
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Container name | `openclaw-parenting-ai` | Docker container running OpenClaw |
-| Agent name | `main` | OpenClaw agent to talk to |
-| Timeout | `120s` | Max wait for AI response |
-
-```bash
-# Example: change container name
-defaults write com.iiba.kairu containerName "my-openclaw-container"
-```
+| Setting | Default | `defaults write` key | Description |
+|---------|---------|---------------------|-------------|
+| Mode | `docker` | `connectionMode` | `docker` / `native` / `ssh` |
+| Container | `openclaw-parenting-ai` | `containerName` | Docker container name |
+| SSH Host | `pi@openclaw-pi` | `sshHost` | SSH target for remote mode |
+| Agent | `main` | `agentName` | OpenClaw agent to talk to |
+| Timeout | `120s` | `timeoutSeconds` | Max wait for AI response |
 
 ## How It Works
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────┐
-│  Kairu (Swift)  │────▶│  docker exec -i  │────▶│  OpenClaw   │
-│  Floating Panel │◀────│  stdin/stdout     │◀────│  Gateway    │
-│  + Balloon UI   │     └──────────────────┘     │  (AI Model) │
-└─────────────────┘                               └─────────────┘
+┌─────────────┐     ┌───────────────────────────┐     ┌──────────┐
+│  Kairu App  │────▶│  docker exec / native /   │────▶│ OpenClaw │
+│  (macOS)    │◀────│  ssh → openclaw agent     │◀────│ Gateway  │
+│  Balloon UI │     │  stdin/stdout              │     │ (AI)     │
+└─────────────┘     └───────────────────────────┘     └──────────┘
 ```
 
 1. User types in the balloon → message sent via `docker exec` stdin (never exposed in `ps`)

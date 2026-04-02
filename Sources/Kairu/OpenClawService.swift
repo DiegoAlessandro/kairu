@@ -2,7 +2,9 @@ import Foundation
 
 /// Snapshot of config values safe to use off-MainActor
 struct OpenClawConnectionConfig: Sendable {
+    let mode: ConnectionMode
     let containerName: String
+    let sshHost: String
     let agentName: String
     let timeoutSeconds: Int
 
@@ -10,7 +12,9 @@ struct OpenClawConnectionConfig: Sendable {
     static var current: OpenClawConnectionConfig {
         let cfg = KairuConfig.shared
         return OpenClawConnectionConfig(
+            mode: cfg.connectionMode,
             containerName: cfg.containerName,
+            sshHost: cfg.sshHost,
             agentName: cfg.agentName,
             timeoutSeconds: cfg.timeoutSeconds
         )
@@ -24,54 +28,56 @@ actor OpenClawService {
         case error(String)
     }
 
-    /// Check if OpenClaw container is running and healthy
+    /// Check if OpenClaw is reachable
     func checkHealth(config: OpenClawConnectionConfig) async -> ConnectionStatus {
+        let args = buildCommand(config: config, subcommand: ["openclaw", "health"])
         do {
-            let output = try await runProcess(
-                arguments: ["docker", "inspect", "--format", "{{.State.Health.Status}}", config.containerName],
-                timeoutSeconds: 5
-            )
-            return output.trimmingCharacters(in: .whitespacesAndNewlines) == "healthy"
+            let output = try await runProcess(arguments: args, timeoutSeconds: 5)
+            let clean = output.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return clean.contains("ok") || clean.contains("healthy") || clean.contains("live")
                 ? .connected : .disconnected
         } catch {
             return .error(error.localizedDescription)
         }
     }
 
-    /// Send a message to OpenClaw via docker exec.
-    /// Uses a temp file inside the container to avoid exposing user input in process args.
+    /// Send a message to OpenClaw via stdin pipe
     func sendMessage(_ text: String, config: OpenClawConnectionConfig) async -> String {
+        // Build the openclaw agent command
+        let ocArgs = ["openclaw", "agent", "--agent", config.agentName, "--local", "-m", text]
+        let args = buildCommand(config: config, subcommand: ocArgs)
+
         do {
-            // Write message to a temp file inside the container via stdin,
-            // then read it with -m "$(cat ...)" to keep user input out of `ps`
-            let tmpPath = "/tmp/kairu_msg_\(UUID().uuidString.prefix(8))"
-
-            // Step 1: Write message to temp file via stdin (safe, no escaping)
-            _ = try await runProcess(
-                arguments: [
-                    "docker", "exec", "-i", config.containerName,
-                    "sh", "-c", "cat > \(tmpPath)"
-                ],
-                stdinData: text.data(using: .utf8),
-                timeoutSeconds: 5
-            )
-
-            // Step 2: Run openclaw reading from the temp file
             let output = try await runProcess(
-                arguments: [
-                    "docker", "exec", config.containerName,
-                    "sh", "-c",
-                    "openclaw agent --agent \(config.agentName) --local -m \"$(cat \(tmpPath))\" ; rm -f \(tmpPath)"
-                ],
+                arguments: args,
                 timeoutSeconds: config.timeoutSeconds
             )
-
             let cleaned = cleanResponse(output)
             return cleaned.isEmpty ? "応答を取得できませんでした。" : cleaned
         } catch let error as OpenClawError {
             return error.userMessage
         } catch {
-            return "接続エラー: \(error.localizedDescription)\nOpenClaw コンテナが起動しているか確認してください。"
+            return "接続エラー: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Command builder
+
+    /// Build the full command array based on connection mode
+    private func buildCommand(config: OpenClawConnectionConfig, subcommand: [String]) -> [String] {
+        switch config.mode {
+        case .docker:
+            // docker exec <container> <subcommand...>
+            return ["docker", "exec", config.containerName] + subcommand
+        case .native:
+            // Run openclaw directly (assumes it's in PATH)
+            return subcommand
+        case .ssh:
+            // ssh <host> <subcommand as single string>
+            let escaped = subcommand.map { arg in
+                arg.contains(" ") || arg.contains("'") ? "'\(arg.replacingOccurrences(of: "'", with: "'\\''"))'" : arg
+            }.joined(separator: " ")
+            return ["ssh", "-o", "ConnectTimeout=5", config.sshHost, escaped]
         }
     }
 
@@ -94,7 +100,7 @@ actor OpenClawService {
         }
     }
 
-    /// Run a process with async I/O, stdin support, and timeout
+    /// Run a process with async I/O and timeout
     private func runProcess(
         arguments: [String],
         stdinData: Data? = nil,
@@ -109,19 +115,16 @@ actor OpenClawService {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
-        // Use stdin pipe if we have data to send
         if let stdinData {
             let stdinPipe = Pipe()
             process.standardInput = stdinPipe
             try process.run()
-            // Write message via stdin then close (safe: no shell escaping needed)
             stdinPipe.fileHandleForWriting.write(stdinData)
             stdinPipe.fileHandleForWriting.closeFile()
         } else {
             try process.run()
         }
 
-        // Read stdout/stderr concurrently to prevent pipe deadlock
         enum ReadResult: Sendable {
             case stdout(Data)
             case stderr(Data)
@@ -157,8 +160,7 @@ actor OpenClawService {
                 case .done: finished = true
                 case .timedOut: throw OpenClawError.timeout
                 }
-                // Once process is done and both pipes are read, cancel timeout
-                if finished && !stdoutData.isEmpty || finished && !stderrData.isEmpty {
+                if finished && (!stdoutData.isEmpty || !stderrData.isEmpty) {
                     group.cancelAll()
                     break
                 }
@@ -169,15 +171,11 @@ actor OpenClawService {
             let stderr = String(data: stderrData, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
-            if !stdout.isEmpty {
-                return stdout
-            }
+            if !stdout.isEmpty { return stdout }
             if stderr.contains("token") || stderr.contains("auth") || stderr.contains("OAuth") {
                 throw OpenClawError.authExpired
             }
-            if !stderr.isEmpty {
-                throw OpenClawError.processError(stderr)
-            }
+            if !stderr.isEmpty { throw OpenClawError.processError(stderr) }
             return ""
         }
     }
