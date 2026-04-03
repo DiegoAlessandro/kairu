@@ -198,6 +198,7 @@ struct ChatBubbleView: View {
             ResizeHandle { delta in
                 bubbleWidth = max(220, bubbleWidth + delta.width)
                 bubbleHeight = max(250, bubbleHeight + delta.height)
+                resizeParentWindow()
             }
         }
         .onAppear {
@@ -250,6 +251,18 @@ struct ChatBubbleView: View {
         }
     }
 
+    private func resizeParentWindow() {
+        // Find the NSWindow hosting this SwiftUI view
+        guard let window = NSApp.windows.first(where: { $0 is ChatBubblePanel }) else { return }
+        var frame = window.frame
+        let oldHeight = frame.height
+        frame.size.width = CGFloat(bubbleWidth)
+        frame.size.height = CGFloat(bubbleHeight)
+        // Keep top-left anchored (macOS origin is bottom-left)
+        frame.origin.y -= (frame.height - oldHeight)
+        window.setFrame(frame, display: true)
+    }
+
     private func copyToClipboard(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
@@ -264,7 +277,7 @@ struct SuggestedQuestions: View {
     private let suggestions = [
         "このエラーを要約して",
         "次にやることを整理して",
-        "このコマンドを説明して",
+        "@dev リポジトリを最新化して",
     ]
 
     var body: some View {

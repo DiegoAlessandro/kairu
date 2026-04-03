@@ -45,11 +45,35 @@ actor OpenClawService {
         }
     }
 
+    /// Short aliases for agent names
+    private let agentAliases: [String: String] = [
+        "dev": "dev-assistant",
+        "biz": "biz-assistant",
+        "pm": "pm-assistant",
+    ]
+
+    /// Parse @agent prefix from message, returns (agentName, cleanMessage)
+    private func parseAgentMention(_ text: String) -> (agent: String?, message: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("@") {
+            let parts = trimmed.dropFirst().split(maxSplits: 1, whereSeparator: { $0.isWhitespace })
+            if parts.count == 2 {
+                let alias = String(parts[0]).lowercased()
+                let resolved = agentAliases[alias] ?? alias
+                return (agent: resolved, message: String(parts[1]))
+            }
+        }
+        return (agent: nil, message: text)
+    }
+
     /// Send a message to OpenClaw via stdin pipe
+    /// Supports @agent prefix to route to different agents (e.g. "@dev git pull all repos")
     func sendMessage(_ text: String, config: OpenClawConnectionConfig) async -> String {
-        // Build the openclaw agent command
-        let ocArgs = ["openclaw", "agent", "--agent", config.agentName, "--local",
-                      "--session-id", sessionId, "-m", text]
+        let (mentionedAgent, cleanMessage) = parseAgentMention(text)
+        let targetAgent = mentionedAgent ?? config.agentName
+
+        let ocArgs = ["openclaw", "agent", "--agent", targetAgent, "--local",
+                      "--session-id", sessionId, "-m", cleanMessage]
         let args = buildCommand(config: config, subcommand: ocArgs)
 
         do {
